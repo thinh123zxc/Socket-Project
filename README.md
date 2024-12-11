@@ -1,2 +1,3 @@
-pip install customtkinter \n
+pip install customtkinter
+
 pip install tkinter
