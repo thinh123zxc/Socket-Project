@@ -35,6 +35,7 @@ message_notlogin = "NOTLOGIN"
 choosen_folder = ['']
 choosen_file = [[]]
 selection = [[]]
+wrong_pin = [False]
 
 def download_frame(parent, client):
     frame = CTkFrame(parent, fg_color='#E4BD63', height=500, width=751)
@@ -93,6 +94,7 @@ def download_frame(parent, client):
             print('message', message)
 
             if message == message_failure:
+                wrong_pin[0] = True
                 label.configure(text='Wrong pin, again')
             else:
                 pin_window.destroy()
@@ -105,7 +107,6 @@ def download_frame(parent, client):
                         name_path_file = cl.find_path_to_save_file(name_path,name_file)
                         file_size = int(client.recv(LENGTH_SIZE).decode().strip())
                         #Lấy nội dung
-                        
                         progress_queue = queue.Queue()
                         def update_progress_bar():
                             progress_bar.set(0)
@@ -113,10 +114,11 @@ def download_frame(parent, client):
                                 if progress_queue.empty():
                                     continue
                                 progress, speed = progress_queue.get_nowait()
-                                lb_progress.configure(text=f'{int(progress * 1000)}%')
-                                lb_speed.configure(text=f'{round(speed, 2)} kb/s')
+                                lb_progress.configure(text=f'{int(progress * 100)}%')
+                                lb_speed.configure(text=f'{speed:.2f} kb/s')
                                 progress_bar.set(progress)
-                                if progress >= 100:
+                                time.sleep(0.0001)
+                                if progress >= 1:
                                     break
                                 
                         thread_update_progress_bar = threading.Thread(target=update_progress_bar)
@@ -131,13 +133,16 @@ def download_frame(parent, client):
                     os.remove(name_path_file)
                 
         def download_UI(client, name_path, name_file, response_ip, Pin, label):
-            client.send(response_ip.ljust(LENGTH_NAME).encode(ENCODING))
-            message = client.recv(LENGTH_MESS).decode().strip()
-            if message == message_error_notfound:
-                print('Khong tim thay thu muc')
-            else: 
+            if wrong_pin[0] == False:
+                client.send(response_ip.ljust(LENGTH_NAME).encode(ENCODING))
+                message = client.recv(LENGTH_MESS).decode().strip()
+                if message == message_error_notfound:
+                    print('Khong tim thay thu muc')
+                else: 
+                    process_login_updownload_UI(client, Pin, label, name_path, name_file)
+            else:
+                wrong_pin[0] = False
                 process_login_updownload_UI(client, Pin, label, name_path, name_file)
-     
     def dir_dialog():
         dir_path = filedialog.askdirectory(title="Select a file")
         choosen_folder[0] = dir_path

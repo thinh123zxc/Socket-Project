@@ -7,6 +7,7 @@ import time
 import os
 import tkinter as tk
 from tkinter import messagebox
+import queue
 
 LENGTH_NUMBER_OF_FILE = 32
 LENGTH_NAME = 32
@@ -97,10 +98,41 @@ def upload_frame(parent, client):
             else:
                 pin_window.destroy()
                 if os.path.isfile(choosen_obj[0]):
-                    thread_upload = threading.Thread(target=cl.upload_UI, args=(client, choosen_obj[0]))
+                    progress_queue = queue.Queue()
+                    def update_progress_bar():
+                        progress_bar.set(0)
+                        while True:
+                            if progress_queue.empty():
+                                continue
+                            progress, speed = progress_queue.get_nowait()
+                            lb_progress.configure(text=f'{int(progress * 100)}%')
+                            lb_speed.configure(text=f'{speed:.2f} kb/s')
+                            progress_bar.set(progress)
+                            time.sleep(0.0001)
+                            if progress >= 1:
+                                break
+                    thread_update_progress_bar = threading.Thread(target=update_progress_bar)
+                    thread_upload = threading.Thread(target=cl.upload_UI, args=(client, choosen_obj[0], progress_queue))
                     thread_upload.start()
+                    thread_update_progress_bar.start()
+                    
                 elif os.path.isdir(choosen_obj[0]):
-                    thread_upload = threading.Thread(target=cl.upload_multithreaded_UI, args=(choosen_obj[0],))
+                    progress_queue = queue.Queue()
+                    def update_progress_bar():
+                        progress_bar.set(0)
+                        lb_speed.configure(text=' ')
+                        while True:
+                            if progress_queue.empty():
+                                continue
+                            current_success, total_file = progress_queue.get_nowait()
+                            lb_progress.configure(text=f'{current_success}/{total_file}')
+                            progress_bar.set(current_success / total_file)
+                            time.sleep(0.00000001)
+                            if current_success == total_file:
+                                break
+                    thread_update_progress_bar = threading.Thread(target=update_progress_bar)
+                    thread_upload = threading.Thread(target=cl.upload_multithreaded_UI, args=(choosen_obj[0], progress_queue))
+                    thread_update_progress_bar.start()
                     thread_upload.start()
         
     #Button choose file
@@ -115,6 +147,13 @@ def upload_frame(parent, client):
     progress_bar = CTkProgressBar(frame, width=300, height=20, fg_color='#FFF', progress_color='#EEEE00')
     progress_bar.set(0)
     progress_bar.place(x=300, y=250)
+    
+    #Nhan hien thi tien do va toc do upload
+    lb_progress = CTkLabel(master=frame, text=' ', font=('Arial', 15, 'bold'), text_color='brown')
+    lb_progress.place(x=620, y=250)
+    
+    lb_speed = CTkLabel(master=frame, text=' ', font=('Arial', 15, 'bold'), text_color='brown')
+    lb_speed.place(x=620, y=280)
             
     #Button start upload file
     def start_progress():

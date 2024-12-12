@@ -3,6 +3,7 @@ import upload_frame as ul
 import download_frame as dl
 import client as cl
 import socket
+from tkinter import messagebox as msb
 
 def clientUI(client):
     # Main
@@ -47,6 +48,15 @@ def clientUI(client):
 
     # Frame 2
     upload_frame.grid(row=0, column=1, sticky="nsew")
+    
+    def close_window():
+        if msb.askokcancel('Quit', 'Confirm close program!'):
+            client.close()
+            main.destroy()
+        else:
+            pass
+        
+    main.protocol('WM_DELETE_WINDOW', close_window)
     return main
 
 if __name__ == '__main__':

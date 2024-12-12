@@ -79,7 +79,6 @@ def handle_client_connection(conn, addr):
                     process_login_updownload(conn,conn.getpeername()[0])
                     response_upload(conn)  # Xử lý upload
                 if mode == 'download':
-                    print('ok')
                     response_download(conn)  # Xử lý download
                 if mode == "upload multithread":
                     process_login_updownload(conn,conn.getpeername()[0])

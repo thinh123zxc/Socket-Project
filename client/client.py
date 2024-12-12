@@ -176,6 +176,31 @@ def send_data_to_upload(name_file,client):
     message = client.recv(LENGTH_MESS).decode().strip()
     if message == message_notenough:
         print('Send fail')
+        
+def send_data_to_upload_UI(name_file,client, queue):
+    start_time = time.time()
+    file = open(name_file,"rb")
+    sended_byte = 0
+    file_size = send_header_to_server(client, name_file,file)
+    name_file_no_path = cut_name_in_path(name_file)
+    while True:
+        #đếm số lần lập
+        number_of_repeat = math.ceil(file_size/ BUFFER)
+        for _ in range(number_of_repeat):
+            chunk = file.read(BUFFER)  
+            if not chunk:
+                break  
+            sended_byte += len(chunk)
+            client.send(chunk)
+            if time.time() - start_time > 0:
+                queue.put((sended_byte / file_size, len(chunk) / (time.time() - start_time) / 1024))
+                start_time = time.time()
+            time.sleep(0.0000005)
+        break
+    file.close()
+    message = client.recv(LENGTH_MESS).decode().strip()
+    if message == message_notenough:
+        print('Send fail')
 
 
 #Upload file
@@ -190,15 +215,25 @@ def upload(client):
     else:
         print("File is not exist")
         
-def upload_UI(client, name_file):
+def upload_UI(client, name_file, queue):
     # process_login_updownload(client)
     if os.path.exists(name_file):
         try:
-            send_data_to_upload(name_file,client)
+            send_data_to_upload_UI(name_file,client, queue)
         except ConnectionResetError:
             print("The server suddenly disconnect!")
     else:
         print("File is not exist")
+        
+# tránh trùng tên
+def process_name_file(path_file):
+    processed_name_file = path_file
+    i = 1
+    while os.path.exists(processed_name_file):
+        name, extension = os.path.splitext(path_file) 
+        processed_name_file = f"{name}({i}){extension}"
+        i += 1
+    return processed_name_file
 
 #tìm đường dẫn để lưu file
 def find_path_to_save_file(name_path,name_file):
@@ -206,14 +241,11 @@ def find_path_to_save_file(name_path,name_file):
     if name_path_and_file[len(name_path_and_file)-1] == '/':
         name_path_and_file += name_file
     else:
-        name_path_and_file =name_path_and_file+ "/" +name_file
-    #Nếu file đã tồn tại thì xóa
-    if os.path.exists(name_path_and_file) == True:
-        os.remove(name_path_and_file)
-    file = open(name_path_and_file,"x")
-    file.close()
+        name_path_and_file = name_path_and_file+ "/" +name_file
+        
+    #Nếu trùng tên thì thêm số thứ tự
+    name_path_and_file = process_name_file(name_path_and_file)
     return name_path_and_file
-
 
 #Lấy nội dung từ client
 def get_content(client,name_file_and_path,file_size):
@@ -366,7 +398,7 @@ def upload_multithreaded():
     except ConnectionResetError:
         print("The server suddenly disconnect!")
         
-def upload_multithreaded_UI(name_folder):
+def upload_multithreaded_UI(name_folder, queue):
     try: 
         if os.path.exists:
             list_file = os.listdir(name_folder)
@@ -380,15 +412,14 @@ def upload_multithreaded_UI(name_folder):
             #Hiện thị thanh bar theo số luồng đã hoàn thành xong
             count_thread = 0
             count_thread_current = 0
-            with alive_bar(len(list_file), title=f"Upload ") as bar:
-                while True:
-                    count_thread = count_thread_success(threads)
-                    if count_thread_current != count_thread:
-                        bar(count_thread - count_thread_current)
-                        count_thread_current = count_thread
-                    time.sleep(0.000000000000000005) 
-                    if count_thread == len(list_file):
-                        break
+            while True:
+                count_thread = count_thread_success(threads)
+                if count_thread_current != count_thread:
+                    count_thread_current = count_thread
+                    queue.put((count_thread, len(list_file)))
+                time.sleep(0.000000000000000005) 
+                if count_thread == len(list_file):
+                    break
             for thread in threads:
                 thread.join()
         else:
